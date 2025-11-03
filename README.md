@@ -2,7 +2,7 @@
 title: markdown-report
 description: A command-line tool to generate HTML or PDF reports from Markdown files
 code_theme: "Solarized (light)"
-slide_theme: "gradient-purple"
+# slide_theme: "gradient-purple"
 ---
 
 # markdown-report
