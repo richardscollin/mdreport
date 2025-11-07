@@ -1,11 +1,11 @@
 ---
-title: markdown-report
+title: mdreport
 description: A command-line tool to generate HTML or PDF reports from Markdown files
 code_theme: "Solarized (light)"
 # slide_theme: "gradient-purple"
 ---
 
-# markdown-report
+# mdreport
 
 A command-line tool to generate HTML or PDF reports from Markdown files.
 This project was primarily generated with claude code using agentic coding.
@@ -22,16 +22,16 @@ cargo install --locked --git https://github.com/richardscollin/mdreport
 
 ```bash
 # Generate HTML report (default)
-markdown-report -i input.md
+mdreport -i input.md
 
 # Generate PDF report
-markdown-report -i input.md -f pdf
+mdreport -i input.md -f pdf
 
 # Specify output file
-markdown-report -i input.md -o report.html
+mdreport -i input.md -o report.html
 
 # Set custom title
-markdown-report -i input.md -t "My Report"
+mdreport -i input.md -t "My Report"
 ```
 
 ### Options
@@ -49,19 +49,19 @@ markdown-report -i input.md -t "My Report"
 ### Generate HTML Report
 
 ```bash
-markdown-report -i documentation.md -o report.html -t "Project Documentation"
+mdreport -i documentation.md -o report.html -t "Project Documentation"
 ```
 
 ### Generate PDF Report
 
 ```bash
-markdown-report -i notes.md -f pdf -t "Meeting Notes"
+mdreport -i notes.md -f pdf -t "Meeting Notes"
 ```
 
 ### List Available Themes
 
 ```bash
-markdown-report --list-themes
+mdreport --list-themes
 ```
 
 ### Embed and Extract Markdown Source
@@ -70,16 +70,16 @@ By default, the source markdown is embedded in generated PDF files, allowing you
 
 ```bash
 # Generate PDF with embedded source (default behavior)
-markdown-report -i notes.md -f pdf
+mdreport -i notes.md -f pdf
 
 # Generate PDF without embedding source
-markdown-report -i notes.md -f pdf --no-embed-source
+mdreport -i notes.md -f pdf --no-embed-source
 
 # Extract embedded markdown from a PDF
-markdown-report -i report.pdf --extract -o extracted.md
+mdreport -i report.pdf --extract -o extracted.md
 
 # Extract with default output name (input.pdf -> input.md)
-markdown-report -i report.pdf --extract
+mdreport -i report.pdf --extract
 ```
 
 This feature is useful for:
