@@ -1,3 +1,8 @@
+use std::{
+    io::Cursor,
+    path::Path,
+};
+
 use lopdf::{
     Document,
     Object,
@@ -8,10 +13,6 @@ use lopdf::{
         Operation,
     },
     dictionary,
-};
-use std::{
-    io::Cursor,
-    path::Path,
 };
 use pulldown_cmark::{
     CodeBlockKind,
@@ -1706,8 +1707,9 @@ pub fn extract_markdown_from_pdf_bytes(pdf_bytes: &[u8]) -> Result<String, std::
 
     // Get EmbeddedFiles from Names
     let embedded_files_ref = if let Object::Dictionary(dict) = names_obj {
-        dict.get(b"EmbeddedFiles")
-            .map_err(|e| std::io::Error::other(format!("No EmbeddedFiles in Names dictionary: {}", e)))?
+        dict.get(b"EmbeddedFiles").map_err(|e| {
+            std::io::Error::other(format!("No EmbeddedFiles in Names dictionary: {}", e))
+        })?
     } else {
         return Err(std::io::Error::other("Names object is not a dictionary"));
     };
@@ -1728,7 +1730,9 @@ pub fn extract_markdown_from_pdf_bytes(pdf_bytes: &[u8]) -> Result<String, std::
         dict.get(b"Names")
             .map_err(|e| std::io::Error::other(format!("No Names array in EmbeddedFiles: {}", e)))?
     } else {
-        return Err(std::io::Error::other("EmbeddedFiles object is not a dictionary"));
+        return Err(std::io::Error::other(
+            "EmbeddedFiles object is not a dictionary",
+        ));
     };
 
     // Parse the Names array to find the filespec
@@ -2005,8 +2009,12 @@ Content for second slide."#;
         for i in 0..100 {
             markdown.push_str(&format!("## Section {}\n\n", i));
             markdown.push_str("Lorem ipsum dolor sit amet, consectetur adipiscing elit. ");
-            markdown.push_str("Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n");
-            markdown.push_str(&format!("```rust\nfn function_{}() {{\n    println!(\"test\");\n}}\n```\n\n", i));
+            markdown
+                .push_str("Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n");
+            markdown.push_str(&format!(
+                "```rust\nfn function_{}() {{\n    println!(\"test\");\n}}\n```\n\n",
+                i
+            ));
         }
 
         let mut pdf_output = Vec::new();

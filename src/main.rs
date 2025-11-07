@@ -78,8 +78,9 @@ fn main() {
                     output.set_extension("md");
                     output
                 });
-                std::fs::write(&output_path, markdown)
-                    .unwrap_or_else(|_| panic!("Failed to write output file: {}", output_path.display()));
+                std::fs::write(&output_path, markdown).unwrap_or_else(|_| {
+                    panic!("Failed to write output file: {}", output_path.display())
+                });
                 println!("Extracted markdown to: {}", output_path.display());
             }
             Err(e) => {
