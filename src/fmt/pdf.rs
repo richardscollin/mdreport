@@ -1054,7 +1054,7 @@ fn embed_file_attachment(doc: &mut Document, content: &str) -> Result<(), std::i
         },
         content.as_bytes().to_vec(),
     );
-    file_stream.compress();
+    let _ = file_stream.compress();
     let file_stream_id = doc.add_object(file_stream);
 
     // Create FileSpec dictionary
