@@ -1,7 +1,3 @@
-#![feature(file_buffered)]
-#![feature(unqualified_local_imports)]
-#![warn(unqualified_local_imports)]
-
 mod fmt;
 mod layout;
 mod parse;
@@ -129,7 +125,8 @@ fn main() {
             println!("HTML report generated: {}", output_path.display());
         }
         OutputFormat::Pdf => {
-            let mut output = std::fs::File::create_buffered(&output_path).unwrap();
+            let output = std::fs::File::create(&output_path).unwrap();
+            let mut output = std::io::BufWriter::new(output);
             crate::fmt::pdf::to_pdf(
                 &markdown_content,
                 &mut output,
@@ -142,7 +139,8 @@ fn main() {
             println!("PDF report generated: {}", output_path.display());
         }
         OutputFormat::Slides => {
-            let mut output = std::fs::File::create_buffered(&output_path).unwrap();
+            let output = std::fs::File::create(&output_path).unwrap();
+            let mut output = std::io::BufWriter::new(output);
             crate::fmt::pdf::to_pdf(
                 &markdown_content,
                 &mut output,

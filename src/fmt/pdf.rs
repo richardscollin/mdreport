@@ -1072,29 +1072,27 @@ fn embed_file_attachment(doc: &mut Document, content: &str) -> Result<(), std::i
     };
     let filespec_id = doc.add_object(filespec);
 
-    // Get or create the Names dictionary in the catalog
-    let _catalog_id = doc
-        .catalog()
-        .map_err(|e| std::io::Error::other(format!("Failed to get catalog: {}", e)))?;
-
-    // Add EmbeddedFiles to the Names dictionary
-    let names_dict = dictionary! {
+    // Create the EmbeddedFiles name tree dictionary
+    let embedded_files_dict = dictionary! {
         "Names" => Object::Array(vec![
             Object::String(filename.as_bytes().to_vec(), lopdf::StringFormat::Literal),
             Object::Reference(filespec_id),
         ]),
     };
-    let names_dict_id = doc.add_object(names_dict);
+    let embedded_files_id = doc.add_object(embedded_files_dict);
 
-    // Update catalog with EmbeddedFiles
-    if let Ok(catalog) = doc.get_object_mut(names_dict_id)
-        && let Object::Dictionary(dict) = catalog
-    {
-        let embedded_files = dictionary! {
-            "EmbeddedFiles" => Object::Reference(names_dict_id),
-        };
-        dict.set("Names", Object::Dictionary(embedded_files));
-    }
+    // Create the Names dictionary for the catalog
+    let catalog_names_dict = dictionary! {
+        "EmbeddedFiles" => Object::Reference(embedded_files_id),
+    };
+    let catalog_names_id = doc.add_object(catalog_names_dict);
+
+    // Get the catalog object and update it with the Names dictionary
+    let catalog = doc
+        .catalog_mut()
+        .map_err(|e| std::io::Error::other(format!("Failed to get catalog: {}", e)))?;
+
+    catalog.set("Names", Object::Reference(catalog_names_id));
 
     Ok(())
 }
@@ -1686,22 +1684,14 @@ pub fn extract_markdown_from_pdf_bytes(pdf_bytes: &[u8]) -> Result<String, std::
         .map_err(|e| std::io::Error::other(format!("Failed to load PDF: {}", e)))?;
 
     // Get the catalog
-    let catalog_id = doc
+    let catalog = doc
         .catalog()
         .map_err(|e| std::io::Error::other(format!("Failed to get catalog: {}", e)))?;
 
-    // Try to get the catalog object
-    let catalog = doc
-        .get_object(catalog_id)
-        .map_err(|e| std::io::Error::other(format!("Failed to get catalog object: {}", e)))?;
-
     // Extract Names dictionary from catalog
-    let names_ref = if let Object::Dictionary(dict) = catalog {
-        dict.get(b"Names")
-            .ok_or_else(|| std::io::Error::other("No Names dictionary in catalog"))?
-    } else {
-        return Err(std::io::Error::other("Catalog is not a dictionary"));
-    };
+    let names_ref = catalog
+        .get(b"Names")
+        .map_err(|e| std::io::Error::other(format!("No Names dictionary in catalog: {}", e)))?;
 
     // Resolve the Names dictionary reference
     let names_id = if let Object::Reference(id) = names_ref {
@@ -1717,7 +1707,7 @@ pub fn extract_markdown_from_pdf_bytes(pdf_bytes: &[u8]) -> Result<String, std::
     // Get EmbeddedFiles from Names
     let embedded_files_ref = if let Object::Dictionary(dict) = names_obj {
         dict.get(b"EmbeddedFiles")
-            .ok_or_else(|| std::io::Error::other("No EmbeddedFiles in Names dictionary"))?
+            .map_err(|e| std::io::Error::other(format!("No EmbeddedFiles in Names dictionary: {}", e)))?
     } else {
         return Err(std::io::Error::other("Names object is not a dictionary"));
     };
@@ -1736,7 +1726,7 @@ pub fn extract_markdown_from_pdf_bytes(pdf_bytes: &[u8]) -> Result<String, std::
     // Get the Names array from EmbeddedFiles
     let names_array = if let Object::Dictionary(dict) = embedded_files_obj {
         dict.get(b"Names")
-            .ok_or_else(|| std::io::Error::other("No Names array in EmbeddedFiles"))?
+            .map_err(|e| std::io::Error::other(format!("No Names array in EmbeddedFiles: {}", e)))?
     } else {
         return Err(std::io::Error::other("EmbeddedFiles object is not a dictionary"));
     };
@@ -1770,7 +1760,7 @@ pub fn extract_markdown_from_pdf_bytes(pdf_bytes: &[u8]) -> Result<String, std::
     // Get the EF (embedded file) dictionary from filespec
     let ef_ref = if let Object::Dictionary(dict) = filespec_obj {
         dict.get(b"EF")
-            .ok_or_else(|| std::io::Error::other("No EF dictionary in filespec"))?
+            .map_err(|e| std::io::Error::other(format!("No EF dictionary in filespec: {}", e)))?
     } else {
         return Err(std::io::Error::other("Filespec is not a dictionary"));
     };
@@ -1779,7 +1769,7 @@ pub fn extract_markdown_from_pdf_bytes(pdf_bytes: &[u8]) -> Result<String, std::
     let file_stream_id = if let Object::Dictionary(ef_dict) = ef_ref {
         if let Object::Reference(id) = ef_dict
             .get(b"F")
-            .ok_or_else(|| std::io::Error::other("No F reference in EF dictionary"))?
+            .map_err(|e| std::io::Error::other(format!("No F reference in EF dictionary: {}", e)))?
         {
             *id
         } else {
@@ -1794,11 +1784,17 @@ pub fn extract_markdown_from_pdf_bytes(pdf_bytes: &[u8]) -> Result<String, std::
         .get_object(file_stream_id)
         .map_err(|e| std::io::Error::other(format!("Failed to get file stream object: {}", e)))?;
 
-    // Extract and decompress the stream data
+    // Extract stream data (try decompression first, fall back to raw content)
     let content = if let Object::Stream(stream) = file_stream_obj {
-        stream
-            .decompressed_content()
-            .map_err(|e| std::io::Error::other(format!("Failed to decompress stream: {}", e)))?
+        // Try to decompress if the stream has a Filter
+        if stream.dict.get(b"Filter").is_ok() {
+            stream
+                .decompressed_content()
+                .map_err(|e| std::io::Error::other(format!("Failed to decompress stream: {}", e)))?
+        } else {
+            // No filter, use raw content
+            stream.content.clone()
+        }
     } else {
         return Err(std::io::Error::other("Embedded file is not a stream"));
     };
