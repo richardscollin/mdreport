@@ -49,6 +49,10 @@ struct Args {
     /// Do not embed the source markdown file in the PDF
     #[arg(long = "no-embed-source", action = ArgAction::SetFalse, default_value = "true")]
     embed_source: bool,
+
+    /// Extract embedded markdown from a PDF file
+    #[arg(long)]
+    extract: bool,
 }
 
 fn main() {
@@ -68,6 +72,27 @@ fn main() {
     }
 
     let input = args.input.expect("Input file is required"); // if not listing themes
+
+    // Handle extraction mode
+    if args.extract {
+        match crate::fmt::pdf::extract_markdown_from_pdf(&input) {
+            Ok(markdown) => {
+                let output_path = args.output.unwrap_or_else(|| {
+                    let mut output = input.clone();
+                    output.set_extension("md");
+                    output
+                });
+                std::fs::write(&output_path, markdown)
+                    .unwrap_or_else(|_| panic!("Failed to write output file: {}", output_path.display()));
+                println!("Extracted markdown to: {}", output_path.display());
+            }
+            Err(e) => {
+                eprintln!("Error extracting markdown: {}", e);
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     let markdown_content = std::fs::read_to_string(&input)
         .unwrap_or_else(|_| panic!("Failed to read input file: {}", input.display()));
 

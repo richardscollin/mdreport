@@ -40,6 +40,8 @@ markdown-report -i input.md -t "My Report"
 - `-o, --output <FILE>` - Output file (defaults to input filename with new extension)
 - `-f, --format <FORMAT>` - Output format: html or pdf (default: html)
 - `--list-themes` - List all available syntax highlighting themes
+- `--no-embed-source` - Do not embed the source markdown file in the PDF (embedding is enabled by default)
+- `--extract` - Extract embedded markdown from a PDF file
 - `-h, --help` - Print help information
 
 ## Examples
@@ -61,6 +63,29 @@ markdown-report -i notes.md -f pdf -t "Meeting Notes"
 ```bash
 markdown-report --list-themes
 ```
+
+### Embed and Extract Markdown Source
+
+By default, the source markdown is embedded in generated PDF files, allowing you to extract it later:
+
+```bash
+# Generate PDF with embedded source (default behavior)
+markdown-report -i notes.md -f pdf
+
+# Generate PDF without embedding source
+markdown-report -i notes.md -f pdf --no-embed-source
+
+# Extract embedded markdown from a PDF
+markdown-report -i report.pdf --extract -o extracted.md
+
+# Extract with default output name (input.pdf -> input.md)
+markdown-report -i report.pdf --extract
+```
+
+This feature is useful for:
+- Version control: Keep the original markdown alongside the PDF
+- Editing: Extract and modify the source from a PDF
+- Archival: Ensure the source is never lost
 
 ### Syntax Highlighting
 

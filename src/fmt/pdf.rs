@@ -9,6 +9,7 @@ use lopdf::{
     },
     dictionary,
 };
+use std::path::Path;
 use pulldown_cmark::{
     CodeBlockKind,
     Event,
@@ -1672,4 +1673,133 @@ pub fn to_pdf<W: std::io::Write>(
         .map_err(|e| std::io::Error::other(format!("PDF save error: {}", e)))?;
 
     Ok(())
+}
+
+/// Extract embedded markdown from a PDF file
+pub fn extract_markdown_from_pdf(pdf_path: &Path) -> Result<String, std::io::Error> {
+    // Load the PDF document
+    let doc = Document::load(pdf_path)
+        .map_err(|e| std::io::Error::other(format!("Failed to load PDF: {}", e)))?;
+
+    // Get the catalog
+    let catalog_id = doc
+        .catalog()
+        .map_err(|e| std::io::Error::other(format!("Failed to get catalog: {}", e)))?;
+
+    // Try to get the catalog object
+    let catalog = doc
+        .get_object(catalog_id)
+        .map_err(|e| std::io::Error::other(format!("Failed to get catalog object: {}", e)))?;
+
+    // Extract Names dictionary from catalog
+    let names_ref = if let Object::Dictionary(dict) = catalog {
+        dict.get(b"Names")
+            .ok_or_else(|| std::io::Error::other("No Names dictionary in catalog"))?
+    } else {
+        return Err(std::io::Error::other("Catalog is not a dictionary"));
+    };
+
+    // Resolve the Names dictionary reference
+    let names_id = if let Object::Reference(id) = names_ref {
+        *id
+    } else {
+        return Err(std::io::Error::other("Names is not a reference"));
+    };
+
+    let names_obj = doc
+        .get_object(names_id)
+        .map_err(|e| std::io::Error::other(format!("Failed to get Names object: {}", e)))?;
+
+    // Get EmbeddedFiles from Names
+    let embedded_files_ref = if let Object::Dictionary(dict) = names_obj {
+        dict.get(b"EmbeddedFiles")
+            .ok_or_else(|| std::io::Error::other("No EmbeddedFiles in Names dictionary"))?
+    } else {
+        return Err(std::io::Error::other("Names object is not a dictionary"));
+    };
+
+    // Resolve EmbeddedFiles reference
+    let embedded_files_id = if let Object::Reference(id) = embedded_files_ref {
+        *id
+    } else {
+        return Err(std::io::Error::other("EmbeddedFiles is not a reference"));
+    };
+
+    let embedded_files_obj = doc
+        .get_object(embedded_files_id)
+        .map_err(|e| std::io::Error::other(format!("Failed to get EmbeddedFiles object: {}", e)))?;
+
+    // Get the Names array from EmbeddedFiles
+    let names_array = if let Object::Dictionary(dict) = embedded_files_obj {
+        dict.get(b"Names")
+            .ok_or_else(|| std::io::Error::other("No Names array in EmbeddedFiles"))?
+    } else {
+        return Err(std::io::Error::other("EmbeddedFiles object is not a dictionary"));
+    };
+
+    // Parse the Names array to find the filespec
+    let filespec_id = if let Object::Array(arr) = names_array {
+        // Names array is in format: [name1, ref1, name2, ref2, ...]
+        // We're looking for the "source" file
+        let mut found_id = None;
+        for i in (0..arr.len()).step_by(2) {
+            if let Some(Object::String(name_bytes, _)) = arr.get(i) {
+                let name = String::from_utf8_lossy(name_bytes);
+                if name == "source" {
+                    if let Some(Object::Reference(id)) = arr.get(i + 1) {
+                        found_id = Some(*id);
+                        break;
+                    }
+                }
+            }
+        }
+        found_id.ok_or_else(|| std::io::Error::other("Source file not found in embedded files"))?
+    } else {
+        return Err(std::io::Error::other("Names is not an array"));
+    };
+
+    // Get the filespec object
+    let filespec_obj = doc
+        .get_object(filespec_id)
+        .map_err(|e| std::io::Error::other(format!("Failed to get filespec object: {}", e)))?;
+
+    // Get the EF (embedded file) dictionary from filespec
+    let ef_ref = if let Object::Dictionary(dict) = filespec_obj {
+        dict.get(b"EF")
+            .ok_or_else(|| std::io::Error::other("No EF dictionary in filespec"))?
+    } else {
+        return Err(std::io::Error::other("Filespec is not a dictionary"));
+    };
+
+    // Get the F (file) reference from EF
+    let file_stream_id = if let Object::Dictionary(ef_dict) = ef_ref {
+        if let Object::Reference(id) = ef_dict
+            .get(b"F")
+            .ok_or_else(|| std::io::Error::other("No F reference in EF dictionary"))?
+        {
+            *id
+        } else {
+            return Err(std::io::Error::other("F is not a reference"));
+        }
+    } else {
+        return Err(std::io::Error::other("EF is not a dictionary"));
+    };
+
+    // Get the embedded file stream
+    let file_stream_obj = doc
+        .get_object(file_stream_id)
+        .map_err(|e| std::io::Error::other(format!("Failed to get file stream object: {}", e)))?;
+
+    // Extract and decompress the stream data
+    let content = if let Object::Stream(stream) = file_stream_obj {
+        stream
+            .decompressed_content()
+            .map_err(|e| std::io::Error::other(format!("Failed to decompress stream: {}", e)))?
+    } else {
+        return Err(std::io::Error::other("Embedded file is not a stream"));
+    };
+
+    // Convert bytes to string
+    String::from_utf8(content)
+        .map_err(|e| std::io::Error::other(format!("Failed to convert to UTF-8: {}", e)))
 }
