@@ -9,7 +9,10 @@ use lopdf::{
     },
     dictionary,
 };
-use std::path::Path;
+use std::{
+    io::Cursor,
+    path::Path,
+};
 use pulldown_cmark::{
     CodeBlockKind,
     Event,
@@ -1675,10 +1678,11 @@ pub fn to_pdf<W: std::io::Write>(
     Ok(())
 }
 
-/// Extract embedded markdown from a PDF file
-pub fn extract_markdown_from_pdf(pdf_path: &Path) -> Result<String, std::io::Error> {
-    // Load the PDF document
-    let doc = Document::load(pdf_path)
+/// Extract embedded markdown from PDF bytes
+pub fn extract_markdown_from_pdf_bytes(pdf_bytes: &[u8]) -> Result<String, std::io::Error> {
+    // Load the PDF document from bytes using a cursor
+    let cursor = Cursor::new(pdf_bytes);
+    let doc = Document::load_from(cursor)
         .map_err(|e| std::io::Error::other(format!("Failed to load PDF: {}", e)))?;
 
     // Get the catalog
@@ -1802,4 +1806,217 @@ pub fn extract_markdown_from_pdf(pdf_path: &Path) -> Result<String, std::io::Err
     // Convert bytes to string
     String::from_utf8(content)
         .map_err(|e| std::io::Error::other(format!("Failed to convert to UTF-8: {}", e)))
+}
+
+/// Extract embedded markdown from a PDF file
+pub fn extract_markdown_from_pdf(pdf_path: &Path) -> Result<String, std::io::Error> {
+    // Read the PDF file into memory
+    let pdf_bytes = std::fs::read(pdf_path)?;
+    // Use the bytes-based extraction
+    extract_markdown_from_pdf_bytes(&pdf_bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that simple markdown can be embedded and extracted
+    #[test]
+    fn test_roundtrip_simple_markdown() {
+        let markdown = "# Hello World\n\nThis is a test.";
+        let mut pdf_output = Vec::new();
+
+        // Generate PDF with embedded source
+        to_pdf(markdown, &mut pdf_output, false, None, true, None).unwrap();
+
+        // Extract the markdown back
+        let extracted = extract_markdown_from_pdf_bytes(&pdf_output).unwrap();
+
+        assert_eq!(markdown, extracted);
+    }
+
+    /// Test that markdown with front matter can be embedded and extracted
+    #[test]
+    fn test_roundtrip_with_frontmatter() {
+        let markdown = r#"---
+title: Test Document
+author: Test Author
+date: 2025-01-01
+code_theme: InspiredGitHub
+---
+
+# Main Title
+
+This is the content."#;
+        let mut pdf_output = Vec::new();
+
+        to_pdf(markdown, &mut pdf_output, false, None, true, None).unwrap();
+        let extracted = extract_markdown_from_pdf_bytes(&pdf_output).unwrap();
+
+        assert_eq!(markdown, extracted);
+    }
+
+    /// Test that complex markdown with code blocks can be embedded and extracted
+    #[test]
+    fn test_roundtrip_with_code_blocks() {
+        let markdown = r#"# Code Example
+
+Here's some Rust code:
+
+```rust
+fn main() {
+    println!("Hello, world!");
+}
+```
+
+And some Python:
+
+```python
+def hello():
+    print("Hello, world!")
+```"#;
+        let mut pdf_output = Vec::new();
+
+        to_pdf(markdown, &mut pdf_output, false, None, true, None).unwrap();
+        let extracted = extract_markdown_from_pdf_bytes(&pdf_output).unwrap();
+
+        assert_eq!(markdown, extracted);
+    }
+
+    /// Test that markdown with lists and formatting can be embedded and extracted
+    #[test]
+    fn test_roundtrip_with_lists_and_formatting() {
+        let markdown = r#"# Features
+
+## Unordered List
+- Item 1
+- Item 2
+  - Nested item
+- Item 3
+
+## Ordered List
+1. First
+2. Second
+3. Third
+
+## Formatting
+This has **bold**, *italic*, and `code` text.
+
+## Task List
+- [x] Completed task
+- [ ] Incomplete task"#;
+        let mut pdf_output = Vec::new();
+
+        to_pdf(markdown, &mut pdf_output, false, None, true, None).unwrap();
+        let extracted = extract_markdown_from_pdf_bytes(&pdf_output).unwrap();
+
+        assert_eq!(markdown, extracted);
+    }
+
+    /// Test that markdown with tables can be embedded and extracted
+    #[test]
+    fn test_roundtrip_with_tables() {
+        let markdown = r#"# Table Example
+
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| A        | B        | C        |
+| D        | E        | F        |"#;
+        let mut pdf_output = Vec::new();
+
+        to_pdf(markdown, &mut pdf_output, false, None, true, None).unwrap();
+        let extracted = extract_markdown_from_pdf_bytes(&pdf_output).unwrap();
+
+        assert_eq!(markdown, extracted);
+    }
+
+    /// Test that special characters and unicode are preserved
+    #[test]
+    fn test_roundtrip_with_unicode() {
+        let markdown = r#"# Unicode Test
+
+This has special characters: é, ñ, 中文, 日本語, 한국어
+
+And symbols: © ™ ® → ← ↔ ✓ ✗
+
+Math-like: ∀ ∃ ∈ ∉ ⊂ ⊃ ∪ ∩"#;
+        let mut pdf_output = Vec::new();
+
+        to_pdf(markdown, &mut pdf_output, false, None, true, None).unwrap();
+        let extracted = extract_markdown_from_pdf_bytes(&pdf_output).unwrap();
+
+        assert_eq!(markdown, extracted);
+    }
+
+    /// Test that markdown with links can be embedded and extracted
+    #[test]
+    fn test_roundtrip_with_links() {
+        let markdown = r#"# Links
+
+[Google](https://google.com)
+
+[GitHub](https://github.com)
+
+Reference style: [link][ref]
+
+[ref]: https://example.com"#;
+        let mut pdf_output = Vec::new();
+
+        to_pdf(markdown, &mut pdf_output, false, None, true, None).unwrap();
+        let extracted = extract_markdown_from_pdf_bytes(&pdf_output).unwrap();
+
+        assert_eq!(markdown, extracted);
+    }
+
+    /// Test that when embed_source is false, extraction fails appropriately
+    #[test]
+    fn test_extraction_fails_when_not_embedded() {
+        let markdown = "# Test";
+        let mut pdf_output = Vec::new();
+
+        // Generate PDF WITHOUT embedded source
+        to_pdf(markdown, &mut pdf_output, false, None, false, None).unwrap();
+
+        // Extraction should fail
+        let result = extract_markdown_from_pdf_bytes(&pdf_output);
+        assert!(result.is_err());
+    }
+
+    /// Test that slide mode PDFs can also embed and extract
+    #[test]
+    fn test_roundtrip_slide_mode() {
+        let markdown = r#"# Slide 1
+
+Content for first slide.
+
+## Slide 2
+
+Content for second slide."#;
+        let mut pdf_output = Vec::new();
+
+        // Generate slides with embedded source
+        to_pdf(markdown, &mut pdf_output, true, None, true, None).unwrap();
+        let extracted = extract_markdown_from_pdf_bytes(&pdf_output).unwrap();
+
+        assert_eq!(markdown, extracted);
+    }
+
+    /// Test that very large markdown content can be embedded and extracted
+    #[test]
+    fn test_roundtrip_large_content() {
+        // Generate a large markdown document
+        let mut markdown = String::from("# Large Document\n\n");
+        for i in 0..100 {
+            markdown.push_str(&format!("## Section {}\n\n", i));
+            markdown.push_str("Lorem ipsum dolor sit amet, consectetur adipiscing elit. ");
+            markdown.push_str("Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n");
+            markdown.push_str(&format!("```rust\nfn function_{}() {{\n    println!(\"test\");\n}}\n```\n\n", i));
+        }
+
+        let mut pdf_output = Vec::new();
+        to_pdf(&markdown, &mut pdf_output, false, None, true, None).unwrap();
+        let extracted = extract_markdown_from_pdf_bytes(&pdf_output).unwrap();
+
+        assert_eq!(markdown, extracted);
+    }
 }
