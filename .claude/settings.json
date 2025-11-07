@@ -6,11 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cargo +nightly fmt"
+            "command": "cargo +nightly clippy --fix --allow-dirty"
           },
           {
             "type": "command",
-            "command": "cargo +nightly clippy --fix --allow-dirty"
+            "command": "cargo +nightly fmt"
           }
         ]
       }

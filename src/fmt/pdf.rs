@@ -1744,10 +1744,11 @@ pub fn extract_markdown_from_pdf_bytes(pdf_bytes: &[u8]) -> Result<String, std::
             if let Some(Object::String(name_bytes, _)) = arr.get(i) {
                 let name = String::from_utf8_lossy(name_bytes);
                 if name == "source"
-                    && let Some(Object::Reference(id)) = arr.get(i + 1) {
-                        found_id = Some(*id);
-                        break;
-                    }
+                    && let Some(Object::Reference(id)) = arr.get(i + 1)
+                {
+                    found_id = Some(*id);
+                    break;
+                }
             }
         }
         found_id.ok_or_else(|| std::io::Error::other("Source file not found in embedded files"))?
