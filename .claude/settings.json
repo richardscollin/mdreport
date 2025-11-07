@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": "cargo +nightly fmt"
+          },
+          {
+            "type": "command",
+            "command": "cargo +nightly clippy --fix --allow-dirty"
           }
         ]
       }
