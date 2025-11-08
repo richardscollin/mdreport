@@ -41,7 +41,7 @@ jobs:
         run: cargo install cargo-auditable --version 0.7.1 --locked
 
       - name: Build release binary
-        run: cargo auditable build --release --target ${{ matrix.target }}
+        run: CARGO_BUILD_SBOM=true cargo auditable build -Z sbom --release --target ${{ matrix.target }}
 
       - name: Prepare artifact (Windows)
         if: matrix.os == 'windows-latest'
