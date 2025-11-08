@@ -34,7 +34,7 @@ struct Args {
     #[arg(short, long, value_enum)]
     format: Option<OutputFormat>,
 
-    /// List all available syntax highlighting themes
+    /// List all available syntax highlighting themes and slide themes
     #[arg(long)]
     list_themes: bool,
 
@@ -55,14 +55,35 @@ fn main() {
     let args = Args::parse();
 
     if args.list_themes {
+        // List code syntax highlighting themes
         let theme_set = ThemeSet::load_defaults();
         let mut theme_names: Vec<&str> = theme_set.themes.keys().map(|s| s.as_str()).collect();
         theme_names.sort();
 
-        println!("Available syntax highlighting themes:");
+        println!("Available code syntax highlighting themes:");
+        println!("  (Use with --code-theme or code_theme front matter)\n");
         for theme_name in theme_names {
             println!("  {}", theme_name);
         }
+
+        // List slide themes
+        println!("\n\nAvailable slide themes:");
+        println!("  (Use with slide_theme front matter in slides format)\n");
+
+        println!("  Solid themes:");
+        println!("    light           - White background with dark text (default)");
+        println!("    dark            - Dark gray background with light text");
+        println!("    blue            - Dark blue background with light blue text");
+
+        println!("\n  Gradient themes:");
+        println!("    gradient-blue   - Light to dark blue gradient");
+        println!("    gradient-purple - Light to dark purple gradient");
+        println!("    gradient-sunset - Warm sunset color gradient");
+
+        println!("\n  Radial themes:");
+        println!("    radial-spotlight - Spotlight effect centered on page");
+        println!("    radial-vignette  - Vignette effect with dark edges");
+        println!("    radial-corner    - Radial gradient from corner");
 
         return;
     }
