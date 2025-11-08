@@ -1,6 +1,6 @@
 # Visual Regression Testing Workflow
 # Runs the exhaustive test suite to generate all output variants
-# Uploads each file as a separate artifact for individual download
+# Uploads all files as a single artifact
 
 name: Visual Regression Tests
 
@@ -47,78 +47,13 @@ jobs:
         run: cargo test exhaustive_test -- --ignored --nocapture
         continue-on-error: false
 
-      - name: Upload individual files as separate artifacts
-        if: always()
-        run: |
-          cd visual_regression_output
-
-          # Upload each file individually
-          for file in *; do
-            if [ -f "$file" ]; then
-              # Get file extension
-              ext="${file##*.}"
-              # Get filename without extension
-              name="${file%.*}"
-
-              echo "Uploading: $file"
-
-              # Use GitHub CLI to upload as artifact
-              # Note: We'll use a script to upload via the artifacts API
-              echo "$file" >> ../artifact_list.txt
-            fi
-          done
-
-          cd ..
-
-      - name: Upload each file as individual artifact
-        if: always()
-        shell: bash
-        run: |
-          # Read the artifact list and upload each file
-          if [ -f artifact_list.txt ]; then
-            while IFS= read -r file; do
-              echo "Creating artifact for: $file"
-              # Create a temporary directory for this file
-              mkdir -p "artifact_temp/$file"
-              cp "visual_regression_output/$file" "artifact_temp/$file/"
-            done < artifact_list.txt
-          fi
-
-      - name: Upload Regular PDFs (individual files)
-        if: always()
+      - name: Upload all visual regression outputs
         uses: actions/upload-artifact@v4
-        with:
-          name: regular-pdfs-all
-          path: visual_regression_output/pdf_*.pdf
-          retention-days: 30
-          compression-level: 0
-
-      - name: Upload Slides PDFs (individual files)
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: slides-pdfs-all
-          path: visual_regression_output/slides_*.pdf
+          name: visual-regression-outputs-${{ github.run_number }}
+          path: visual_regression_output/
           retention-days: 30
-          compression-level: 0
-
-      - name: Upload HTML files
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: html-files
-          path: visual_regression_output/*.html
-          retention-days: 30
-          compression-level: 0
-
-      - name: Upload Email text file
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: email-files
-          path: visual_regression_output/*.txt
-          retention-days: 30
-          compression-level: 0
 
       - name: Generate detailed summary
         if: always()
@@ -126,8 +61,6 @@ jobs:
           echo "# 📊 Visual Regression Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 📦 Files Generated" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All files are uploaded **without compression** for direct viewing." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Count files
@@ -137,13 +70,20 @@ jobs:
           TXT_COUNT=$(find visual_regression_output -name '*.txt' 2>/dev/null | wc -l)
           TOTAL_COUNT=$((PDF_COUNT + SLIDES_COUNT + HTML_COUNT + TXT_COUNT))
 
-          echo "| Category | Count | Artifact Name |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|---------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 📄 Regular PDFs | $PDF_COUNT | \`regular-pdfs-all\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🎨 Slides PDFs | $SLIDES_COUNT | \`slides-pdfs-all\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🌐 HTML Files | $HTML_COUNT | \`html-files\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 📧 Email Files | $TXT_COUNT | \`email-files\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Total** | **$TOTAL_COUNT** | |" >> $GITHUB_STEP_SUMMARY
+          echo "| Category | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📄 Regular PDFs | $PDF_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎨 Slides PDFs | $SLIDES_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌐 HTML Files | $HTML_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📧 Email Files | $TXT_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Total** | **$TOTAL_COUNT** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 📥 Download Artifact" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifact:** \`visual-regression-outputs-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download from the 'Artifacts' section at the bottom of this workflow run." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "## 📋 File List" >> $GITHUB_STEP_SUMMARY
@@ -178,6 +118,4 @@ jobs:
 
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "💡 **Note:** Files are uploaded with compression-level 0 (store only)." >> $GITHUB_STEP_SUMMARY
-          echo "Download artifacts from the bottom of this page. Each category contains uncompressed files." >> $GITHUB_STEP_SUMMARY
-          echo "Artifacts are retained for 30 days." >> $GITHUB_STEP_SUMMARY
+          echo "💡 **Tip:** Artifacts are retained for 30 days." >> $GITHUB_STEP_SUMMARY
