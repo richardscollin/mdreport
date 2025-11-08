@@ -70,7 +70,8 @@ jobs:
 
       - name: Publish to crates.io (trusted publishing)
         if: ${{ !inputs.dry-run }}
-        run: cargo publish --token $(curl -s -H "Accept: application/json" -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=crates.io" | jq -r '.value')
+        run: |
+          cargo publish --token $(curl -s -H "Accept: application/json" -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=crates.io" | jq -r '.value')
 
       - name: Create git tag and GitHub release
         if: ${{ !inputs.dry-run && inputs.create-tag }}
