@@ -3,3 +3,4 @@ Cargo.lock
 *.pdf
 TODO.md
 visual_regression_output/
+artifacts/
