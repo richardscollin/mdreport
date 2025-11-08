@@ -16,6 +16,18 @@ This project was primarily generated with claude code using agentic coding.
 cargo install --locked --git https://github.com/richardscollin/mdreport
 ```
 
+## Publishing
+
+To publish a new release:
+
+1. Update the version in `Cargo.toml`
+2. Commit and push your changes
+3. Go to Actions → "Publish to crates.io" → "Run workflow"
+4. Configure options:
+   - **create-tag**: Create git tag and GitHub release (triggers binary builds)
+   - **pre-release**: Mark as pre-release (for alpha, beta, rc versions)
+   - **dry-run**: Test without actually publishing
+
 ## Usage
 
 ### Basic Usage

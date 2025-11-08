@@ -1,0 +1,95 @@
+name: Publish to crates.io
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (leave empty to use version from Cargo.toml)'
+        required: false
+        type: string
+      create-tag:
+        description: 'Create git tag for this release'
+        required: false
+        type: boolean
+        default: true
+      pre-release:
+        description: 'Mark this as a pre-release (for alpha, beta, rc versions)'
+        required: false
+        type: boolean
+        default: false
+      dry-run:
+        description: 'Perform a dry run (do not actually publish)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  id-token: write  # Required for trusted publishing to crates.io
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Check if version needs to be updated
+        id: version-check
+        run: |
+          CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "cargo_version=$CARGO_VERSION" >> $GITHUB_OUTPUT
+
+          if [ -n "${{ inputs.version }}" ]; then
+            if [ "${{ inputs.version }}" != "$CARGO_VERSION" ]; then
+              echo "Version mismatch: Cargo.toml has $CARGO_VERSION but you specified ${{ inputs.version }}"
+              echo "Please update Cargo.toml version first or leave version input empty"
+              exit 1
+            fi
+          fi
+
+          echo "Publishing version: $CARGO_VERSION"
+
+      - name: Run tests
+        run: |
+          cargo fmt --check
+          cargo clippy -- -Dwarnings
+          cargo test
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Dry run publish
+        if: ${{ inputs.dry-run }}
+        run: cargo publish --dry-run
+
+      - name: Publish to crates.io (trusted publishing)
+        if: ${{ !inputs.dry-run }}
+        run: cargo publish --token $(curl -s -H "Accept: application/json" -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=crates.io" | jq -r '.value')
+
+      - name: Create git tag and GitHub release
+        if: ${{ !inputs.dry-run && inputs.create-tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version-check.outputs.cargo_version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+          # Create GitHub release (the release.yml workflow will add binary assets)
+          PRERELEASE_FLAG=""
+          if [ "${{ inputs.pre-release }}" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          gh release create "v$VERSION" \
+            --title "Release v$VERSION" \
+            --notes "Published to crates.io: https://crates.io/crates/mdreport/$VERSION" \
+            $PRERELEASE_FLAG
