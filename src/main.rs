@@ -34,7 +34,7 @@ struct Args {
     #[arg(short, long, value_enum)]
     format: Option<OutputFormat>,
 
-    /// List all available syntax highlighting themes
+    /// List all available syntax highlighting themes and slide themes
     #[arg(long)]
     list_themes: bool,
 
@@ -55,13 +55,59 @@ fn main() {
     let args = Args::parse();
 
     if args.list_themes {
+        // List code syntax highlighting themes
         let theme_set = ThemeSet::load_defaults();
         let mut theme_names: Vec<&str> = theme_set.themes.keys().map(|s| s.as_str()).collect();
         theme_names.sort();
 
-        println!("Available syntax highlighting themes:");
+        println!("Available code syntax highlighting themes:");
+        println!("  (Use with --code-theme or code_theme front matter)\n");
         for theme_name in theme_names {
             println!("  {}", theme_name);
+        }
+
+        // List slide themes
+        println!("\n\nAvailable slide themes:");
+        println!("  (Use with slide_theme front matter in slides format)\n");
+
+        let slide_themes = crate::fmt::pdf::get_slide_themes();
+
+        // Group themes by category
+        let solid_themes: Vec<_> = slide_themes
+            .iter()
+            .filter(|t| t.category == crate::fmt::pdf::ThemeCategory::Solid)
+            .collect();
+        let gradient_themes: Vec<_> = slide_themes
+            .iter()
+            .filter(|t| t.category == crate::fmt::pdf::ThemeCategory::Gradient)
+            .collect();
+        let radial_themes: Vec<_> = slide_themes
+            .iter()
+            .filter(|t| t.category == crate::fmt::pdf::ThemeCategory::Radial)
+            .collect();
+
+        // Print solid themes
+        if !solid_themes.is_empty() {
+            println!("  Solid themes:");
+            for theme in solid_themes {
+                println!("    {:20} - {}", theme.name, theme.description);
+            }
+        }
+
+        // Print gradient themes
+        if !gradient_themes.is_empty() {
+            println!("\n  Gradient themes:");
+            for theme in gradient_themes {
+                println!("    {:20} - {}", theme.name, theme.description);
+            }
+        }
+
+        // Print radial themes
+        if !radial_themes.is_empty() {
+            println!("\n  Radial themes:");
+            for theme in radial_themes {
+                println!("    {:20} - {}", theme.name, theme.description);
+            }
         }
 
         return;

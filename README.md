@@ -38,8 +38,8 @@ mdreport -i input.md -t "My Report"
 
 - `-i, --input <FILE>` - Input markdown file (required unless using --list-themes)
 - `-o, --output <FILE>` - Output file (defaults to input filename with new extension)
-- `-f, --format <FORMAT>` - Output format: html or pdf (default: html)
-- `--list-themes` - List all available syntax highlighting themes
+- `-f, --format <FORMAT>` - Output format: html, pdf, or slides (default: html)
+- `--list-themes` - List all available syntax highlighting themes and slide themes
 - `--no-embed-source` - Do not embed the source markdown file in the PDF (embedding is enabled by default)
 - `--extract` - Extract embedded markdown from a PDF file
 - `-h, --help` - Print help information
@@ -86,6 +86,80 @@ This feature is useful for:
 - Version control: Keep the original markdown alongside the PDF
 - Editing: Extract and modify the source from a PDF
 - Archival: Ensure the source is never lost
+
+### Presentation Slides
+
+Generate beautiful presentation slides from Markdown with customizable themes. The slides format creates a PDF with each H2 heading starting a new slide.
+
+```bash
+# Generate slides (auto-detected from .slides.pdf extension)
+mdreport -i presentation.md -o slides.slides.pdf
+
+# Or explicitly specify slides format
+mdreport -i presentation.md -f slides -o presentation.pdf
+```
+
+#### Available Slide Themes
+
+Control the visual appearance of your slides using the `slide_theme` front matter option. Use `--list-themes` to see all available themes.
+
+**Solid Themes:**
+- `light` - White background with dark text (default)
+- `dark` - Dark gray background with light text
+- `blue` - Dark blue background with light blue text
+
+**Gradient Themes:**
+- `gradient-blue` - Light to dark blue gradient
+- `gradient-purple` - Light to dark purple gradient
+- `gradient-sunset` - Warm sunset color gradient
+
+**Radial Themes:**
+- `radial-spotlight` - Spotlight effect centered on page
+- `radial-vignette` - Vignette effect with dark edges
+- `radial-corner` - Radial gradient from corner
+
+#### Customizing Gradient Direction
+
+For gradient themes, you can specify the direction using the `gradient_direction` front matter option:
+
+Available directions: `top-to-bottom`, `bottom-to-top`, `left-to-right`, `right-to-left`, `diagonal`, `diagonal-reverse`, `diagonal-alt`, `diagonal-alt-reverse`
+
+#### Example Presentation
+
+````markdown
+---
+title: My Presentation
+author: Jane Doe
+date: 2025-11-08
+slide_theme: "gradient-purple"
+gradient_direction: "diagonal"
+---
+
+# Welcome to My Presentation
+
+This content appears on the title slide.
+
+## First Topic
+
+Each H2 heading creates a new slide automatically.
+
+- Bullet points work great
+- Multiple levels supported
+
+## Second Topic
+
+You can include code blocks:
+
+```rust
+fn main() {
+    println!("Hello from slides!");
+}
+```
+
+## Conclusion
+
+Thank you!
+````
 
 ### Syntax Highlighting
 
@@ -142,7 +216,8 @@ The front matter supports:
 - **author**: Author name
 - **date**: Document date
 - **code_theme**: Syntax highlighting theme for code blocks in PDF (use `--list-themes` to see options)
-- **slides_theme**: Slide theme in PDF
+- **slide_theme**: Slide theme for presentation slides (see [Presentation Slides](#presentation-slides) section)
+- **gradient_direction**: Direction for gradient slide themes (see [Presentation Slides](#presentation-slides) section)
 
 ## Examples / Tests
 

@@ -100,6 +100,23 @@ struct SlideTheme {
     heading_color: (f32, f32, f32),
 }
 
+/// Theme category for organizing themes
+#[derive(Clone, Debug, PartialEq)]
+pub enum ThemeCategory {
+    Solid,
+    Gradient,
+    Radial,
+}
+
+/// A slide theme definition with metadata
+#[derive(Clone, Debug)]
+pub struct SlideThemeDefinition {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub category: ThemeCategory,
+    theme: SlideTheme,
+}
+
 #[derive(Clone, Debug)]
 enum BackgroundStyle {
     Solid((f32, f32, f32)),
@@ -131,84 +148,11 @@ enum GradientDirection {
 
 impl SlideTheme {
     fn get_by_name(name: &str) -> Self {
-        match name {
-            "dark" => Self {
-                background: BackgroundStyle::Solid((0.1, 0.1, 0.1)),
-                text_color: (0.9, 0.9, 0.9),
-                heading_color: (1.0, 1.0, 1.0),
-            },
-            "light" => Self {
-                background: BackgroundStyle::Solid((1.0, 1.0, 1.0)),
-                text_color: (0.0, 0.0, 0.0),
-                heading_color: (0.0, 0.0, 0.0),
-            },
-            "blue" => Self {
-                background: BackgroundStyle::Solid((0.1, 0.2, 0.3)),
-                text_color: (0.9, 0.95, 1.0),
-                heading_color: (0.4, 0.7, 1.0),
-            },
-            "gradient-blue" => Self {
-                background: BackgroundStyle::Gradient {
-                    from: (0.1, 0.2, 0.4),
-                    to: (0.05, 0.1, 0.2),
-                    direction: GradientDirection::TopToBottom,
-                },
-                text_color: (0.9, 0.95, 1.0),
-                heading_color: (0.5, 0.8, 1.0),
-            },
-            "gradient-purple" => Self {
-                background: BackgroundStyle::Gradient {
-                    from: (0.3, 0.1, 0.4),
-                    to: (0.15, 0.05, 0.25),
-                    direction: GradientDirection::TopToBottom,
-                },
-                text_color: (0.95, 0.9, 1.0),
-                heading_color: (0.8, 0.5, 1.0),
-            },
-            "gradient-sunset" => Self {
-                background: BackgroundStyle::Gradient {
-                    from: (0.4, 0.2, 0.3),
-                    to: (0.2, 0.1, 0.2),
-                    direction: GradientDirection::TopToBottom,
-                },
-                text_color: (1.0, 0.95, 0.9),
-                heading_color: (1.0, 0.8, 0.6),
-            },
-            "radial-spotlight" => Self {
-                background: BackgroundStyle::Radial {
-                    center_color: (0.2, 0.25, 0.3),
-                    edge_color: (0.05, 0.05, 0.1),
-                    center_x: 0.5,
-                    center_y: 0.5,
-                    radius: 0.8,
-                },
-                text_color: (0.9, 0.95, 1.0),
-                heading_color: (0.5, 0.8, 1.0),
-            },
-            "radial-vignette" => Self {
-                background: BackgroundStyle::Radial {
-                    center_color: (0.15, 0.15, 0.15),
-                    edge_color: (0.0, 0.0, 0.0),
-                    center_x: 0.5,
-                    center_y: 0.5,
-                    radius: 1.0,
-                },
-                text_color: (0.95, 0.95, 0.95),
-                heading_color: (1.0, 1.0, 1.0),
-            },
-            "radial-corner" => Self {
-                background: BackgroundStyle::Radial {
-                    center_color: (0.3, 0.2, 0.4),
-                    edge_color: (0.1, 0.05, 0.15),
-                    center_x: 0.0,
-                    center_y: 1.0,
-                    radius: 1.2,
-                },
-                text_color: (0.95, 0.9, 1.0),
-                heading_color: (0.8, 0.6, 1.0),
-            },
-            _ => Self::default(),
-        }
+        SLIDE_THEMES
+            .iter()
+            .find(|def| def.name == name)
+            .map(|def| def.theme.clone())
+            .unwrap_or_else(Self::default)
     }
 
     fn with_direction(mut self, direction: GradientDirection) -> Self {
@@ -231,6 +175,138 @@ impl Default for SlideTheme {
             heading_color: (0.0, 0.0, 0.0),
         }
     }
+}
+
+/// Static list of all available slide themes
+static SLIDE_THEMES: &[SlideThemeDefinition] = &[
+    // Solid themes
+    SlideThemeDefinition {
+        name: "light",
+        description: "White background with dark text (default)",
+        category: ThemeCategory::Solid,
+        theme: SlideTheme {
+            background: BackgroundStyle::Solid((1.0, 1.0, 1.0)),
+            text_color: (0.0, 0.0, 0.0),
+            heading_color: (0.0, 0.0, 0.0),
+        },
+    },
+    SlideThemeDefinition {
+        name: "dark",
+        description: "Dark gray background with light text",
+        category: ThemeCategory::Solid,
+        theme: SlideTheme {
+            background: BackgroundStyle::Solid((0.1, 0.1, 0.1)),
+            text_color: (0.9, 0.9, 0.9),
+            heading_color: (1.0, 1.0, 1.0),
+        },
+    },
+    SlideThemeDefinition {
+        name: "blue",
+        description: "Dark blue background with light blue text",
+        category: ThemeCategory::Solid,
+        theme: SlideTheme {
+            background: BackgroundStyle::Solid((0.1, 0.2, 0.3)),
+            text_color: (0.9, 0.95, 1.0),
+            heading_color: (0.4, 0.7, 1.0),
+        },
+    },
+    // Gradient themes
+    SlideThemeDefinition {
+        name: "gradient-blue",
+        description: "Light to dark blue gradient",
+        category: ThemeCategory::Gradient,
+        theme: SlideTheme {
+            background: BackgroundStyle::Gradient {
+                from: (0.1, 0.2, 0.4),
+                to: (0.05, 0.1, 0.2),
+                direction: GradientDirection::TopToBottom,
+            },
+            text_color: (0.9, 0.95, 1.0),
+            heading_color: (0.5, 0.8, 1.0),
+        },
+    },
+    SlideThemeDefinition {
+        name: "gradient-purple",
+        description: "Light to dark purple gradient",
+        category: ThemeCategory::Gradient,
+        theme: SlideTheme {
+            background: BackgroundStyle::Gradient {
+                from: (0.3, 0.1, 0.4),
+                to: (0.15, 0.05, 0.25),
+                direction: GradientDirection::TopToBottom,
+            },
+            text_color: (0.95, 0.9, 1.0),
+            heading_color: (0.8, 0.5, 1.0),
+        },
+    },
+    SlideThemeDefinition {
+        name: "gradient-sunset",
+        description: "Warm sunset color gradient",
+        category: ThemeCategory::Gradient,
+        theme: SlideTheme {
+            background: BackgroundStyle::Gradient {
+                from: (0.4, 0.2, 0.3),
+                to: (0.2, 0.1, 0.2),
+                direction: GradientDirection::TopToBottom,
+            },
+            text_color: (1.0, 0.95, 0.9),
+            heading_color: (1.0, 0.8, 0.6),
+        },
+    },
+    // Radial themes
+    SlideThemeDefinition {
+        name: "radial-spotlight",
+        description: "Spotlight effect centered on page",
+        category: ThemeCategory::Radial,
+        theme: SlideTheme {
+            background: BackgroundStyle::Radial {
+                center_color: (0.2, 0.25, 0.3),
+                edge_color: (0.05, 0.05, 0.1),
+                center_x: 0.5,
+                center_y: 0.5,
+                radius: 0.8,
+            },
+            text_color: (0.9, 0.95, 1.0),
+            heading_color: (0.5, 0.8, 1.0),
+        },
+    },
+    SlideThemeDefinition {
+        name: "radial-vignette",
+        description: "Vignette effect with dark edges",
+        category: ThemeCategory::Radial,
+        theme: SlideTheme {
+            background: BackgroundStyle::Radial {
+                center_color: (0.15, 0.15, 0.15),
+                edge_color: (0.0, 0.0, 0.0),
+                center_x: 0.5,
+                center_y: 0.5,
+                radius: 1.0,
+            },
+            text_color: (0.95, 0.95, 0.95),
+            heading_color: (1.0, 1.0, 1.0),
+        },
+    },
+    SlideThemeDefinition {
+        name: "radial-corner",
+        description: "Radial gradient from corner",
+        category: ThemeCategory::Radial,
+        theme: SlideTheme {
+            background: BackgroundStyle::Radial {
+                center_color: (0.3, 0.2, 0.4),
+                edge_color: (0.1, 0.05, 0.15),
+                center_x: 0.0,
+                center_y: 1.0,
+                radius: 1.2,
+            },
+            text_color: (0.95, 0.9, 1.0),
+            heading_color: (0.8, 0.6, 1.0),
+        },
+    },
+];
+
+/// Get all available slide theme definitions
+pub fn get_slide_themes() -> &'static [SlideThemeDefinition] {
+    SLIDE_THEMES
 }
 
 /// Built-in PDF font names
