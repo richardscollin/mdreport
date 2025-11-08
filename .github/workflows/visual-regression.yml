@@ -1,6 +1,6 @@
 # Visual Regression Testing Workflow
 # Runs the exhaustive test suite to generate all output variants
-# Uploads generated files as separate artifacts by category for easy access
+# Uploads each file as a separate artifact for individual download
 
 name: Visual Regression Tests
 
@@ -47,119 +47,137 @@ jobs:
         run: cargo test exhaustive_test -- --ignored --nocapture
         continue-on-error: false
 
-      - name: Organize output files
+      - name: Upload individual files as separate artifacts
         if: always()
         run: |
-          mkdir -p artifacts/pdfs
-          mkdir -p artifacts/slides
-          mkdir -p artifacts/html-email
+          cd visual_regression_output
 
-          # Move regular PDFs
-          find visual_regression_output -name 'pdf_*.pdf' -exec mv {} artifacts/pdfs/ \;
+          # Upload each file individually
+          for file in *; do
+            if [ -f "$file" ]; then
+              # Get file extension
+              ext="${file##*.}"
+              # Get filename without extension
+              name="${file%.*}"
 
-          # Move slides PDFs
-          find visual_regression_output -name 'slides_*.pdf' -exec mv {} artifacts/slides/ \;
+              echo "Uploading: $file"
 
-          # Move HTML and email files
-          find visual_regression_output -name '*.html' -exec mv {} artifacts/html-email/ \;
-          find visual_regression_output -name '*.txt' -exec mv {} artifacts/html-email/ \;
+              # Use GitHub CLI to upload as artifact
+              # Note: We'll use a script to upload via the artifacts API
+              echo "$file" >> ../artifact_list.txt
+            fi
+          done
 
-      - name: Upload Regular PDFs
-        uses: actions/upload-artifact@v4
+          cd ..
+
+      - name: Upload each file as individual artifact
         if: always()
-        with:
-          name: regular-pdfs-${{ github.run_number }}
-          path: artifacts/pdfs/
-          retention-days: 30
-          compression-level: 9
+        shell: bash
+        run: |
+          # Read the artifact list and upload each file
+          if [ -f artifact_list.txt ]; then
+            while IFS= read -r file; do
+              echo "Creating artifact for: $file"
+              # Create a temporary directory for this file
+              mkdir -p "artifact_temp/$file"
+              cp "visual_regression_output/$file" "artifact_temp/$file/"
+            done < artifact_list.txt
+          fi
 
-      - name: Upload Slides PDFs
-        uses: actions/upload-artifact@v4
+      - name: Upload Regular PDFs (individual files)
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: slides-pdfs-${{ github.run_number }}
-          path: artifacts/slides/
+          name: regular-pdfs-all
+          path: visual_regression_output/pdf_*.pdf
           retention-days: 30
-          compression-level: 9
+          compression-level: 0
 
-      - name: Upload HTML and Email Files
-        uses: actions/upload-artifact@v4
+      - name: Upload Slides PDFs (individual files)
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: html-email-${{ github.run_number }}
-          path: artifacts/html-email/
+          name: slides-pdfs-all
+          path: visual_regression_output/slides_*.pdf
           retention-days: 30
-          compression-level: 6
+          compression-level: 0
+
+      - name: Upload HTML files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-files
+          path: visual_regression_output/*.html
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload Email text file
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: email-files
+          path: visual_regression_output/*.txt
+          retention-days: 30
+          compression-level: 0
 
       - name: Generate detailed summary
         if: always()
         run: |
           echo "# 📊 Visual Regression Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 📦 Artifacts Generated" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Files Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All files are uploaded **without compression** for direct viewing." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Count files
-          PDF_COUNT=$(find artifacts/pdfs -type f 2>/dev/null | wc -l)
-          SLIDES_COUNT=$(find artifacts/slides -type f 2>/dev/null | wc -l)
-          HTML_EMAIL_COUNT=$(find artifacts/html-email -type f 2>/dev/null | wc -l)
-          TOTAL_COUNT=$((PDF_COUNT + SLIDES_COUNT + HTML_EMAIL_COUNT))
+          PDF_COUNT=$(find visual_regression_output -name 'pdf_*.pdf' 2>/dev/null | wc -l)
+          SLIDES_COUNT=$(find visual_regression_output -name 'slides_*.pdf' 2>/dev/null | wc -l)
+          HTML_COUNT=$(find visual_regression_output -name '*.html' 2>/dev/null | wc -l)
+          TXT_COUNT=$(find visual_regression_output -name '*.txt' 2>/dev/null | wc -l)
+          TOTAL_COUNT=$((PDF_COUNT + SLIDES_COUNT + HTML_COUNT + TXT_COUNT))
 
-          echo "| Category | Count | Description |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|-------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 📄 Regular PDFs | $PDF_COUNT | PDF reports with different code themes and embed options |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🎨 Slides PDFs | $SLIDES_COUNT | Presentation slides with various themes and gradients |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🌐 HTML/Email | $HTML_EMAIL_COUNT | HTML reports and email formats |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Total** | **$TOTAL_COUNT** | **All generated files** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Category | Count | Artifact Name |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|---------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📄 Regular PDFs | $PDF_COUNT | \`regular-pdfs-all\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎨 Slides PDFs | $SLIDES_COUNT | \`slides-pdfs-all\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌐 HTML Files | $HTML_COUNT | \`html-files\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📧 Email Files | $TXT_COUNT | \`email-files\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Total** | **$TOTAL_COUNT** | |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "## 📥 Download Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Artifacts are available for download at the bottom of this workflow run." >> $GITHUB_STEP_SUMMARY
-          echo "Each category is packaged separately for your convenience:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **\`regular-pdfs-${{ github.run_number }}\`** - Regular PDF reports" >> $GITHUB_STEP_SUMMARY
-          echo "- **\`slides-pdfs-${{ github.run_number }}\`** - Slides presentations" >> $GITHUB_STEP_SUMMARY
-          echo "- **\`html-email-${{ github.run_number }}\`** - HTML and email outputs" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 File List" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "## 📋 File Details" >> $GITHUB_STEP_SUMMARY
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary><b>Regular PDFs ($PDF_COUNT files)</b></summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          find visual_regression_output -name 'pdf_*.pdf' -exec basename {} \; | sort >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ $PDF_COUNT -gt 0 ]; then
-            echo "<details>" >> $GITHUB_STEP_SUMMARY
-            echo "<summary><b>Regular PDFs ($PDF_COUNT files)</b></summary>" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            ls -lh artifacts/pdfs/ | tail -n +2 | awk '{printf "%-40s %8s\n", $9, $5}' >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            echo "</details>" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary><b>Slides PDFs ($SLIDES_COUNT files)</b></summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          find visual_regression_output -name 'slides_*.pdf' -exec basename {} \; | sort >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ $SLIDES_COUNT -gt 0 ]; then
-            echo "<details>" >> $GITHUB_STEP_SUMMARY
-            echo "<summary><b>Slides PDFs ($SLIDES_COUNT files)</b></summary>" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            ls -lh artifacts/slides/ | tail -n +2 | awk '{printf "%-40s %8s\n", $9, $5}' >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            echo "</details>" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ $HTML_EMAIL_COUNT -gt 0 ]; then
-            echo "<details>" >> $GITHUB_STEP_SUMMARY
-            echo "<summary><b>HTML/Email Files ($HTML_EMAIL_COUNT files)</b></summary>" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            ls -lh artifacts/html-email/ | tail -n +2 | awk '{printf "%-40s %8s\n", $9, $5}' >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            echo "</details>" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary><b>HTML/Email Files</b></summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          find visual_regression_output \( -name '*.html' -o -name '*.txt' \) -exec basename {} \; | sort >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "💡 **Tip:** Download artifacts from the 'Artifacts' section at the bottom of this page." >> $GITHUB_STEP_SUMMARY
-          echo "Each artifact is retained for 30 days." >> $GITHUB_STEP_SUMMARY
+          echo "💡 **Note:** Files are uploaded with compression-level 0 (store only)." >> $GITHUB_STEP_SUMMARY
+          echo "Download artifacts from the bottom of this page. Each category contains uncompressed files." >> $GITHUB_STEP_SUMMARY
+          echo "Artifacts are retained for 30 days." >> $GITHUB_STEP_SUMMARY
