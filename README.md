@@ -16,6 +16,37 @@ This project was primarily generated with claude code using agentic coding.
 cargo install --locked --git https://github.com/richardscollin/mdreport
 ```
 
+## Publishing to crates.io
+
+This project includes a manually triggered GitHub Actions workflow for publishing to crates.io.
+
+### Setup
+
+1. Generate a crates.io API token:
+   - Go to https://crates.io/settings/tokens
+   - Create a new token with publish permissions
+
+2. Add the token to GitHub secrets:
+   - Go to your repository Settings → Secrets and variables → Actions
+   - Create a new secret named `CARGO_REGISTRY_TOKEN`
+   - Paste your crates.io token as the value
+
+### Publishing a Release
+
+1. Update the version in `Cargo.toml`
+2. Commit and push your changes
+3. Go to Actions → "Publish to crates.io" → "Run workflow"
+4. Configure the workflow options:
+   - **version**: Leave empty to use the version from Cargo.toml, or specify to verify
+   - **create-tag**: Check to automatically create a git tag (triggers binary releases)
+   - **dry-run**: Check to test the publish without actually releasing
+
+The workflow will:
+- Run tests and linting
+- Build the release binary
+- Publish to crates.io
+- Optionally create a git tag (which triggers the binary release workflow)
+
 ## Usage
 
 ### Basic Usage
