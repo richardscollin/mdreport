@@ -24,9 +24,9 @@ jobs:
             artifact_name: mdreport
             asset_name: mdreport-linux-x86_64
           - os: macos-latest
-            target: x86_64-apple-darwin
+            target: aarch64-apple-darwin
             artifact_name: mdreport
-            asset_name: mdreport-macos-x86_64
+            asset_name: mdreport-macos-aarch64
 
     steps:
       - uses: actions/checkout@v4
