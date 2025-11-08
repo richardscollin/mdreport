@@ -1,0 +1,121 @@
+# Visual Regression Testing Workflow
+# Runs the exhaustive test suite to generate all output variants
+# Uploads all files as a single artifact
+
+name: Visual Regression Tests
+
+on:
+  # Run on pull requests to main
+  pull_request:
+    branches: [main]
+  # Allow manual trigger
+  workflow_dispatch:
+  # Run on pushes to main (for baseline updates)
+  push:
+    branches: [main]
+
+jobs:
+  visual-regression:
+    name: Generate Visual Regression Outputs
+    # Run on Ubuntu LTS only as specified
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build mdreport
+        run: cargo build --release
+
+      - name: Run exhaustive visual regression test
+        run: cargo test exhaustive_test -- --ignored --nocapture
+        continue-on-error: false
+
+      - name: Upload all visual regression outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-regression-outputs-${{ github.run_number }}
+          path: visual_regression_output/
+          retention-days: 30
+
+      - name: Generate detailed summary
+        if: always()
+        run: |
+          echo "# 📊 Visual Regression Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Files Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count files
+          PDF_COUNT=$(find visual_regression_output -name 'pdf_*.pdf' 2>/dev/null | wc -l)
+          SLIDES_COUNT=$(find visual_regression_output -name 'slides_*.pdf' 2>/dev/null | wc -l)
+          HTML_COUNT=$(find visual_regression_output -name '*.html' 2>/dev/null | wc -l)
+          TXT_COUNT=$(find visual_regression_output -name '*.txt' 2>/dev/null | wc -l)
+          TOTAL_COUNT=$((PDF_COUNT + SLIDES_COUNT + HTML_COUNT + TXT_COUNT))
+
+          echo "| Category | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📄 Regular PDFs | $PDF_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎨 Slides PDFs | $SLIDES_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌐 HTML Files | $HTML_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📧 Email Files | $TXT_COUNT |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Total** | **$TOTAL_COUNT** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 📥 Download Artifact" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifact:** \`visual-regression-outputs-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download from the 'Artifacts' section at the bottom of this workflow run." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 📋 File List" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary><b>Regular PDFs ($PDF_COUNT files)</b></summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          find visual_regression_output -name 'pdf_*.pdf' -exec basename {} \; | sort >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary><b>Slides PDFs ($SLIDES_COUNT files)</b></summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          find visual_regression_output -name 'slides_*.pdf' -exec basename {} \; | sort >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary><b>HTML/Email Files</b></summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          find visual_regression_output \( -name '*.html' -o -name '*.txt' \) -exec basename {} \; | sort >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "💡 **Tip:** Artifacts are retained for 30 days." >> $GITHUB_STEP_SUMMARY
