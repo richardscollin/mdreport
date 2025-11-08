@@ -18,3 +18,11 @@ jobs:
       - run: cargo clippy -- -Dwarnings
       - run: cargo build
       - run: cargo test
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo build --release
+      - run: cargo test
