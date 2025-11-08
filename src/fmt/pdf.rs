@@ -1,38 +1,16 @@
-use std::{
-    io::Cursor,
-    path::Path,
-};
+use std::{io::Cursor, path::Path};
 
 use lopdf::{
-    Document,
-    Object,
-    ObjectId,
-    Stream,
-    content::{
-        Content,
-        Operation,
-    },
+    Document, Object, ObjectId, Stream,
+    content::{Content, Operation},
     dictionary,
 };
-use pulldown_cmark::{
-    CodeBlockKind,
-    Event,
-    Tag,
-    TagEnd,
-};
-use syntect::{
-    easy::HighlightLines,
-    highlighting::ThemeSet,
-    parsing::SyntaxSet,
-};
+use pulldown_cmark::{CodeBlockKind, Event, Tag, TagEnd};
+use syntect::{easy::HighlightLines, highlighting::ThemeSet, parsing::SyntaxSet};
 
 use crate::{
     layout::LayoutItem,
-    parse::{
-        CodeBlockInfo,
-        FrontMatter,
-        MarkdownParser,
-    },
+    parse::{CodeBlockInfo, FrontMatter, MarkdownParser},
 };
 
 /// PDF measurement unit (millimeters)

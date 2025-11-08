@@ -1,23 +1,9 @@
 use std::str::FromStr;
 
-use pulldown_cmark::{
-    CodeBlockKind,
-    CowStr,
-    Event,
-    Tag,
-    TagEnd,
-    html,
-};
+use pulldown_cmark::{CodeBlockKind, CowStr, Event, Tag, TagEnd, html};
 
-use super::{
-    build_github_url,
-    html_escape,
-    resolve_repo,
-};
-use crate::parse::{
-    CodeBlockInfo,
-    MarkdownParser,
-};
+use super::{build_github_url, html_escape, resolve_repo};
+use crate::parse::{CodeBlockInfo, MarkdownParser};
 
 pub fn to_plain_text(markdown_content: &str) -> String {
     let parser = MarkdownParser::new(markdown_content).unwrap();

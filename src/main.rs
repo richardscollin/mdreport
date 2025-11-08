@@ -4,11 +4,7 @@ mod parse;
 
 use std::path::PathBuf;
 
-use clap::{
-    ArgAction,
-    Parser,
-    ValueEnum,
-};
+use clap::{ArgAction, Parser, ValueEnum};
 use syntect::highlighting::ThemeSet;
 
 #[derive(Debug, Clone, ValueEnum)]

@@ -17,8 +17,7 @@ fn exhaustive_test() {
 
     // Read the README.md as test input
     let readme_path = PathBuf::from("README.md");
-    let readme_content = fs::read_to_string(&readme_path)
-        .expect("Failed to read README.md");
+    let readme_content = fs::read_to_string(&readme_path).expect("Failed to read README.md");
 
     println!("Starting exhaustive visual regression tests...");
     println!("Output directory: {}", output_dir.display());
@@ -169,7 +168,10 @@ fn test_slides_variants(markdown: &str, output_dir: &PathBuf, source_path: &Path
             Some(source_path),
         );
 
-        let filename = format!("slides_{}_no_embed.pdf", sanitize_filename(&theme_info.name));
+        let filename = format!(
+            "slides_{}_no_embed.pdf",
+            sanitize_filename(&theme_info.name)
+        );
         count += generate_pdf(
             &markdown_with_theme,
             output_dir,
@@ -194,11 +196,8 @@ fn test_slides_variants(markdown: &str, output_dir: &PathBuf, source_path: &Path
     ];
 
     for direction in &gradient_directions {
-        let markdown_with_gradient = prepend_slide_theme_and_direction(
-            markdown,
-            "gradient-purple",
-            direction,
-        );
+        let markdown_with_gradient =
+            prepend_slide_theme_and_direction(markdown, "gradient-purple", direction);
 
         let filename = format!(
             "slides_gradient_purple_{}.pdf",
@@ -318,7 +317,9 @@ fn prepend_slide_theme_and_direction(markdown: &str, theme: &str, direction: &st
             for line in lines {
                 let trimmed = line.trim();
                 // Skip commented out lines
-                if trimmed.starts_with('#') && (trimmed.contains("slide_theme:") || trimmed.contains("gradient_direction:")) {
+                if trimmed.starts_with('#')
+                    && (trimmed.contains("slide_theme:") || trimmed.contains("gradient_direction:"))
+                {
                     continue;
                 }
                 // Replace existing slide_theme
