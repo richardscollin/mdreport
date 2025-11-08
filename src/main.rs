@@ -70,20 +70,45 @@ fn main() {
         println!("\n\nAvailable slide themes:");
         println!("  (Use with slide_theme front matter in slides format)\n");
 
-        println!("  Solid themes:");
-        println!("    light           - White background with dark text (default)");
-        println!("    dark            - Dark gray background with light text");
-        println!("    blue            - Dark blue background with light blue text");
+        let slide_themes = crate::fmt::pdf::get_slide_themes();
 
-        println!("\n  Gradient themes:");
-        println!("    gradient-blue   - Light to dark blue gradient");
-        println!("    gradient-purple - Light to dark purple gradient");
-        println!("    gradient-sunset - Warm sunset color gradient");
+        // Group themes by category
+        let solid_themes: Vec<_> = slide_themes
+            .iter()
+            .filter(|t| t.category == crate::fmt::pdf::ThemeCategory::Solid)
+            .collect();
+        let gradient_themes: Vec<_> = slide_themes
+            .iter()
+            .filter(|t| t.category == crate::fmt::pdf::ThemeCategory::Gradient)
+            .collect();
+        let radial_themes: Vec<_> = slide_themes
+            .iter()
+            .filter(|t| t.category == crate::fmt::pdf::ThemeCategory::Radial)
+            .collect();
 
-        println!("\n  Radial themes:");
-        println!("    radial-spotlight - Spotlight effect centered on page");
-        println!("    radial-vignette  - Vignette effect with dark edges");
-        println!("    radial-corner    - Radial gradient from corner");
+        // Print solid themes
+        if !solid_themes.is_empty() {
+            println!("  Solid themes:");
+            for theme in solid_themes {
+                println!("    {:20} - {}", theme.name, theme.description);
+            }
+        }
+
+        // Print gradient themes
+        if !gradient_themes.is_empty() {
+            println!("\n  Gradient themes:");
+            for theme in gradient_themes {
+                println!("    {:20} - {}", theme.name, theme.description);
+            }
+        }
+
+        // Print radial themes
+        if !radial_themes.is_empty() {
+            println!("\n  Radial themes:");
+            for theme in radial_themes {
+                println!("    {:20} - {}", theme.name, theme.description);
+            }
+        }
 
         return;
     }
