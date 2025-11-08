@@ -18,34 +18,42 @@ cargo install --locked --git https://github.com/richardscollin/mdreport
 
 ## Publishing to crates.io
 
-This project includes a manually triggered GitHub Actions workflow for publishing to crates.io.
+This project includes a manually triggered GitHub Actions workflow for publishing to crates.io using **Trusted Publishing** (OpenID Connect), which is more secure than using API tokens.
 
 ### Setup
 
-1. Generate a crates.io API token:
+1. Configure trusted publishing on crates.io:
    - Go to https://crates.io/settings/tokens
-   - Create a new token with publish permissions
+   - Click on the "Trusted Publishers" tab
+   - Add a new trusted publisher with these settings:
+     - **Provider**: GitHub Actions
+     - **Repository owner**: Your GitHub username/org
+     - **Repository name**: mdreport
+     - **Workflow**: publish-crate.yml
+     - **Environment** (optional): Leave empty unless using GitHub environments
 
-2. Add the token to GitHub secrets:
-   - Go to your repository Settings → Secrets and variables → Actions
-   - Create a new secret named `CARGO_REGISTRY_TOKEN`
-   - Paste your crates.io token as the value
+2. Ensure your repository has the workflow file committed (already done)
+
+No API tokens or secrets needed! The workflow uses OIDC to authenticate automatically.
 
 ### Publishing a Release
 
 1. Update the version in `Cargo.toml`
+   - For stable releases: `0.1.0`, `1.0.0`, etc.
+   - For pre-releases: `0.1.0-alpha.1`, `0.1.0-beta.1`, `0.1.0-rc.1`, etc.
 2. Commit and push your changes
 3. Go to Actions → "Publish to crates.io" → "Run workflow"
 4. Configure the workflow options:
    - **version**: Leave empty to use the version from Cargo.toml, or specify to verify
-   - **create-tag**: Check to automatically create a git tag (triggers binary releases)
+   - **create-tag**: Check to automatically create a git tag and GitHub release
+   - **pre-release**: Check to mark the GitHub release as a pre-release (for alpha, beta, rc versions)
    - **dry-run**: Check to test the publish without actually releasing
 
 The workflow will:
-- Run tests and linting
+- Run tests and linting (fmt, clippy, tests)
 - Build the release binary
 - Publish to crates.io
-- Optionally create a git tag (which triggers the binary release workflow)
+- Optionally create a git tag and GitHub release (which triggers the binary build workflow)
 
 ## Usage
 

@@ -12,6 +12,11 @@ on:
         required: false
         type: boolean
         default: true
+      pre-release:
+        description: 'Mark this as a pre-release (for alpha, beta, rc versions)'
+        required: false
+        type: boolean
+        default: false
       dry-run:
         description: 'Perform a dry run (do not actually publish)'
         required: false
@@ -20,6 +25,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write  # Required for trusted publishing to crates.io
 
 jobs:
   publish:
@@ -62,17 +68,28 @@ jobs:
         if: ${{ inputs.dry-run }}
         run: cargo publish --dry-run
 
-      - name: Publish to crates.io
+      - name: Publish to crates.io (trusted publishing)
         if: ${{ !inputs.dry-run }}
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish
+        run: cargo publish --token $(curl -s -H "Accept: application/json" -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=crates.io" | jq -r '.value')
 
-      - name: Create git tag
+      - name: Create git tag and GitHub release
         if: ${{ !inputs.dry-run && inputs.create-tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.version-check.outputs.cargo_version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "v$VERSION" -m "Release v$VERSION"
           git push origin "v$VERSION"
+
+          # Create GitHub release (the release.yml workflow will add binary assets)
+          PRERELEASE_FLAG=""
+          if [ "${{ inputs.pre-release }}" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          gh release create "v$VERSION" \
+            --title "Release v$VERSION" \
+            --notes "Published to crates.io: https://crates.io/crates/mdreport/$VERSION" \
+            $PRERELEASE_FLAG
