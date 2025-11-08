@@ -1,0 +1,84 @@
+# Visual Regression Testing Workflow
+# Runs the exhaustive test suite to generate all output variants
+# Uploads generated files as artifacts for manual comparison
+
+name: Visual Regression Tests
+
+on:
+  # Run on pull requests to main
+  pull_request:
+    branches: [main]
+  # Allow manual trigger
+  workflow_dispatch:
+  # Run on pushes to main (for baseline updates)
+  push:
+    branches: [main]
+
+jobs:
+  visual-regression:
+    name: Generate Visual Regression Outputs
+    # Run on Ubuntu LTS only as specified
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build mdreport
+        run: cargo build --release
+
+      - name: Run exhaustive visual regression test
+        run: cargo test exhaustive_test -- --ignored --nocapture
+        continue-on-error: false
+
+      - name: List generated files
+        run: |
+          echo "Generated visual regression outputs:"
+          ls -lah visual_regression_output/
+          echo ""
+          echo "File count: $(ls -1 visual_regression_output/ | wc -l)"
+
+      - name: Upload visual regression outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-regression-outputs-${{ github.run_number }}-${{ github.sha }}
+          path: visual_regression_output/
+          retention-days: 30
+          compression-level: 9
+
+      - name: Generate artifact summary
+        if: always()
+        run: |
+          echo "## Visual Regression Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Generated Files" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Total files generated: $(ls -1 visual_regression_output/ | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### File Breakdown" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- HTML files: $(find visual_regression_output/ -name '*.html' | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- PDF files: $(find visual_regression_output/ -name '*.pdf' | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- Text files: $(find visual_regression_output/ -name '*.txt' | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Download Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The generated files have been uploaded as artifacts and can be downloaded from the workflow run summary." >> $GITHUB_STEP_SUMMARY
+          echo "Artifacts are retained for 30 days." >> $GITHUB_STEP_SUMMARY
