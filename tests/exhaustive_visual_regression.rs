@@ -1,5 +1,7 @@
-use std::fs;
-use std::path::PathBuf;
+use std::{
+    fs,
+    path::PathBuf,
+};
 
 /// Exhaustive visual regression test that generates all combinations of mdreport outputs
 /// This test is ignored by default and should be run explicitly in CI for visual regression testing
