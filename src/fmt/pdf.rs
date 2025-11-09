@@ -1729,6 +1729,10 @@ pub fn to_pdf<W: std::io::Write>(
                 state.flush();
                 current_row.push(std::mem::take(&mut state.current_cell_segments));
             }
+            Event::Rule => {
+                // Horizontal rule (---) triggers a page break
+                builder.new_page();
+            }
             Event::SoftBreak | Event::HardBreak => {
                 if state.in_code_block {
                     code_buffer.push('\n');
