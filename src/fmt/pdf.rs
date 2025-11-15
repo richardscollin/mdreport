@@ -861,6 +861,23 @@ impl PdfBuilder {
         self.y_position -= amount;
     }
 
+    /// Draw a line from (x1, y1) to (x2, y2)
+    fn draw_line(&mut self, x1: Mm, y1: Mm, x2: Mm, y2: Mm, width: f32) {
+        self.current_ops.push(Operation::new("q", vec![])); // Save state
+        self.current_ops
+            .push(Operation::new("w", vec![width.into()])); // Line width
+        self.current_ops.push(Operation::new(
+            "m",
+            vec![x1.to_points().into(), y1.to_points().into()],
+        )); // Move to
+        self.current_ops.push(Operation::new(
+            "l",
+            vec![x2.to_points().into(), y2.to_points().into()],
+        )); // Line to
+        self.current_ops.push(Operation::new("S", vec![])); // Stroke
+        self.current_ops.push(Operation::new("Q", vec![])); // Restore state
+    }
+
     /// Render wrapped text in a table cell and return the height used
     fn write_wrapped_cell(&mut self, words: &[Word], x: Mm, size: f32, column_width: Mm) -> Mm {
         if words.is_empty() {
@@ -1174,6 +1191,66 @@ fn embed_file_attachment(doc: &mut Document, content: &str) -> Result<(), std::i
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum TableStyle {
+    Simple, // No borders or separators
+    Lined,  // With borders and separators
+}
+
+/// Detect table style from the raw markdown text at the given range
+/// Detect all table styles in the markdown by scanning for table patterns
+fn detect_all_table_styles(markdown_content: &str) -> Vec<TableStyle> {
+    let mut styles = Vec::new();
+    let lines: Vec<&str> = markdown_content.lines().collect();
+    let mut i = 0;
+    let mut in_code_block = false;
+
+    while i < lines.len() {
+        let line = lines[i];
+        let trimmed = line.trim();
+
+        // Track code blocks to avoid detecting tables inside them
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_code_block = !in_code_block;
+            i += 1;
+            continue;
+        }
+
+        // Skip if we're inside a code block
+        if in_code_block {
+            i += 1;
+            continue;
+        }
+
+        // Check if this looks like a table separator line
+        // Must have pipes or be a pipe-less separator (simple table)
+        let _has_pipes = trimmed.contains('|');
+        let is_separator = !trimmed.is_empty()
+            && trimmed.chars().filter(|&c| c == '-').count() > 2
+            && trimmed
+                .chars()
+                .all(|c| c == '-' || c == '|' || c == ':' || c.is_whitespace());
+
+        if is_separator && i > 0 {
+            // Look at the line before the separator to determine table style
+            let prev_line = lines[i - 1].trim();
+            // Previous line should also look like table content (contain |)
+            if !prev_line.is_empty() && prev_line.contains('|') {
+                let style = if prev_line.starts_with('|') && prev_line.ends_with('|') {
+                    TableStyle::Lined
+                } else {
+                    TableStyle::Simple
+                };
+                styles.push(style);
+            }
+        }
+
+        i += 1;
+    }
+
+    styles
+}
+
 pub fn to_pdf<W: std::io::Write>(
     markdown_content: &str,
     mut output: W,
@@ -1290,6 +1367,7 @@ pub fn to_pdf<W: std::io::Write>(
         in_table: bool,
         in_code_block: bool,
         in_table_head: bool,
+        table_style: Option<TableStyle>,
         task_list_marker: Option<bool>,
         list_depth: usize,
         item_depth: usize,
@@ -1325,6 +1403,15 @@ pub fn to_pdf<W: std::io::Write>(
     let mut code_lang = String::new();
     let mut table_rows: Vec<Vec<Vec<TextSegment>>> = Vec::new();
     let mut current_row: Vec<Vec<TextSegment>> = Vec::new();
+
+    let content_without_fm = markdown_content
+        .strip_prefix("---\n")
+        .and_then(|after_open| after_open.find("\n---\n").map(|pos| &after_open[pos + 5..]))
+        .unwrap_or(markdown_content);
+
+    // Pre-scan to detect all table styles
+    let table_styles = detect_all_table_styles(content_without_fm);
+    let mut current_table_index = 0;
 
     for event in parser.into_inner() {
         match event {
@@ -1641,6 +1728,8 @@ pub fn to_pdf<W: std::io::Write>(
             }
             Event::Start(Tag::Table(_)) => {
                 state.in_table = true;
+                state.table_style = table_styles.get(current_table_index).copied();
+                current_table_index += 1;
                 table_rows.clear();
             }
             Event::End(TagEnd::Table) => {
@@ -1679,38 +1768,107 @@ pub fn to_pdf<W: std::io::Write>(
                         vec![usable_width / num_cols as f32; num_cols]
                     };
 
+                    let is_lined = state.table_style == Some(TableStyle::Lined);
+                    let table_start_x = builder.left_margin + Mm(5.0);
+                    let line_width = 0.5;
+                    let table_width: Mm = column_widths.iter().fold(Mm(0.0), |acc, &w| acc + w)
+                        + column_spacing * (num_cols - 1) as f32;
+
+                    // For lined tables, add padding inside cells
+                    let cell_padding = if is_lined { Mm(2.5) } else { Mm(0.0) };
+                    let cell_top_padding = if is_lined { Mm(5.5) } else { Mm(0.0) };
+                    let cell_bottom_padding = if is_lined { Mm(-0.5) } else { Mm(0.0) };
+
+                    let mut is_first_row = true;
                     for row in table_rows.iter() {
                         builder.check_page_break(builder.line_height * 1.5);
 
                         let row_start_y = builder.y_position;
+
+                        // Draw top border for lined tables (first row or after page break)
+                        if is_lined && is_first_row {
+                            builder.draw_line(
+                                table_start_x,
+                                row_start_y,
+                                table_start_x + table_width,
+                                row_start_y,
+                                line_width,
+                            );
+                        }
+                        is_first_row = false;
+
                         let mut max_cell_height = Mm(0.0);
 
-                        let mut x_offset = builder.left_margin + Mm(5.0);
+                        let mut x_offset = table_start_x;
                         for (col_idx, cell_segments) in row.iter().enumerate() {
-                            builder.y_position = row_start_y;
+                            // For lined tables, start text below the top padding
+                            builder.y_position = row_start_y - cell_top_padding;
 
                             let words = segments_to_words(cell_segments, 10.0);
                             let col_width = column_widths.get(col_idx).copied().unwrap_or(Mm(50.0));
 
+                            // Add padding for lined tables
+                            let text_x = x_offset + cell_padding;
+                            let text_width = col_width - (cell_padding * 2.0);
+
                             let cell_height =
-                                builder.write_wrapped_cell(&words, x_offset, 10.0, col_width);
-                            max_cell_height = Mm(max_cell_height.0.max(cell_height.0));
+                                builder.write_wrapped_cell(&words, text_x, 10.0, text_width);
+                            max_cell_height = Mm(max_cell_height
+                                .0
+                                .max(cell_height.0 + cell_top_padding.0 + cell_bottom_padding.0));
 
                             x_offset += col_width + column_spacing;
                         }
 
-                        builder.y_position = row_start_y - max_cell_height;
+                        let row_bottom_y = row_start_y - max_cell_height;
+                        builder.y_position = row_bottom_y;
+
+                        // Draw borders for this row in lined tables
+                        if is_lined {
+                            // Draw bottom border of row
+                            builder.draw_line(
+                                table_start_x,
+                                row_bottom_y,
+                                table_start_x + table_width,
+                                row_bottom_y,
+                                line_width,
+                            );
+
+                            // Draw vertical borders for this row
+                            let mut x = table_start_x;
+                            // Left border
+                            builder.draw_line(x, row_start_y, x, row_bottom_y, line_width);
+
+                            for col_width in &column_widths {
+                                x += *col_width + column_spacing;
+                                builder.draw_line(
+                                    x - column_spacing,
+                                    row_start_y,
+                                    x - column_spacing,
+                                    row_bottom_y,
+                                    line_width,
+                                );
+                            }
+                        }
                     }
 
                     builder.move_down(builder.line_height * 0.5);
                     table_rows.clear();
                 }
                 state.in_table = false;
+                state.table_style = None;
             }
             Event::Start(Tag::TableHead) => {
                 state.in_table_head = true;
+                // TableHead directly contains cells, no TableRow wrapper
+                current_row.clear();
             }
             Event::End(TagEnd::TableHead) => {
+                // End of header, add the row
+                if !current_row.is_empty() {
+                    table_rows.push(current_row.clone());
+                    current_row.clear();
+                }
                 state.in_table_head = false;
             }
             Event::Start(Tag::TableRow) => {
@@ -1740,7 +1898,13 @@ pub fn to_pdf<W: std::io::Write>(
                     state.text_buffer.push(' ');
                 }
             }
-            _ => {}
+            Event::Start(_) => (),
+            Event::End(_) => (),
+            Event::InlineMath(_cow_str) => (),
+            Event::DisplayMath(_cow_str) => (),
+            Event::Html(_cow_str) => (),
+            Event::InlineHtml(_cow_str) => (),
+            Event::FootnoteReference(_cow_str) => (),
         }
     }
 

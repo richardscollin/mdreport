@@ -233,7 +233,21 @@ The front matter supports:
 
 ## Examples / Tests
 
-### Table
+### Simple Table
+
+ Function                              | Purpose                                      
+---------------------------------------|----------------------------------------------
+ `setupterm(term, filedes, errret)`    | Initialize terminal for given terminal type  
+ `tiparm_s(expected, mask, str, ...)`  | Safe parameter formatting (modern)           
+ `tiparm(str, ...)`                    | Parameter formatting (newer)                 
+ `tparm(str, ...)`                     | Parameter formatting (legacy)                
+ `tigetflag(cap_code)`                 | Retrieve boolean terminal capability         
+ `tigetnum(cap_code)`                  | Retrieve numeric terminal capability         
+ `tigetstr(cap_code)`                  | Retrieve string terminal capability          
+ `del_curterm(oterm)`                  | Free terminal data structure                 
+
+
+### GFM Standard Table
 
 | Function                              | Purpose                                      |
 |---------------------------------------|----------------------------------------------|
